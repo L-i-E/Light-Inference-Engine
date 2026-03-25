@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { api } from '@/lib/api';
 import type { Citation, QueryResponse } from '@/lib/types';
 import { Send, Loader2, BookOpen, AlertTriangle, ExternalLink } from 'lucide-react';
+import MathRenderer from '@/components/MathRenderer';
 
 interface Message {
   id: string;
@@ -66,7 +67,7 @@ function AssistantMessage({ msg }: { msg: Message }) {
           </div>
         )}
         <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl px-4 py-3 text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">
-          {msg.content}
+          <MathRenderer text={msg.content} />
         </div>
         {msg.citations && msg.citations.length > 0 && (
           <div>

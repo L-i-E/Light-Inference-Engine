@@ -1,13 +1,21 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import type { UserRole } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { BookOpen, MessageSquare, FolderOpen, Settings, LogOut, Wifi, WifiOff } from 'lucide-react';
 
-const navItems = [
-  { to: '/', icon: MessageSquare, label: 'Query' },
-  { to: '/documents', icon: FolderOpen, label: 'Documents' },
-  { to: '/admin', icon: Settings, label: 'Admin' },
+const allNavItems = [
+  { to: '/', icon: MessageSquare, label: 'Query', minRole: 'researcher' as UserRole },
+  { to: '/documents', icon: FolderOpen, label: 'Documents', minRole: 'lab_pi' as UserRole },
+  { to: '/admin', icon: Settings, label: 'Admin', minRole: 'admin' as UserRole },
 ];
+
+const ROLE_LEVEL: Record<UserRole, number> = { researcher: 1, lab_pi: 2, admin: 3 };
+
+function hasAccess(userRole: UserRole | null, minRole: UserRole): boolean {
+  if (!userRole) return false;
+  return ROLE_LEVEL[userRole] >= ROLE_LEVEL[minRole];
+}
 
 function HealthBadge() {
   const [online, setOnline] = useState<boolean | null>(null);
@@ -39,7 +47,7 @@ function HealthBadge() {
 }
 
 export default function Layout() {
-  const { logout } = useAuth();
+  const { logout, role } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -67,7 +75,7 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {navItems.map(({ to, icon: Icon, label }) => (
+          {allNavItems.filter(({ minRole }) => hasAccess(role, minRole)).map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
