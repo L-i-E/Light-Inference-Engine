@@ -230,4 +230,91 @@ Score bar: h-1 rounded-full (보라/인디고/회색 3단계)
 
 ---
 
-*작성일: 2026-03-26 / 작성자: Edwin Cho*
+## 6. Phase 2.1 — Graphite Lab 리팩터링 설계
+
+### 6-1. 방향 결정
+
+**선택:** Direction A — Graphite Lab  
+**핵심 원칙:**
+- 퍼플을 "빼는 것"이 아니라 **"뒤로 물리는 것"**
+- 강한 색 포인트를 최소화하고, 중립 그레이/슬레이트를 앞으로
+- 기능 변경 없이 색·톤·질감만 변경
+
+**색 역할 분류 (역할 기반 색 설계):**
+
+| 역할 | 설명 | 허용 색 |
+| --- | --- | --- |
+| Primary | 주 액션 (Send, Login, Rebuild) | `indigo-600` solid 한 곳만 |
+| Focus | 인풋 포커스 링 | `indigo-500/60` |
+| Info | Health badge, role badge | `cyan-400` / `teal-400` |
+| Semantic | 성공/경고/오류 | `green-400`, `yellow-400`, `red-400` 유지 |
+| Decorative | orb, glow, 배경 효과 | **제거 또는 무채색 처리** |
+| Brand | 로고, 로그인 로고만 | `purple-500` 1~2개 최대 |
+
+---
+
+### 6-2. 색 토큰 매핑
+
+#### 배경 계열
+
+| 토큰 | 현재 | 변경 후 | 비고 |
+| --- | --- | --- | --- |
+| `bg-base` | `#0a0a0f` | `#080b10` | 약간 네이비 틴트 |
+| `bg-surface` | `rgba(255,255,255,0.025)` | `#0f1117` | 명시적 다크 슬레이트 |
+| `bg-card` | `rgba(255,255,255,0.03)` | `#111827` (gray-900) | |
+| `bg-input` | `bg-slate-800` | `#0d1117` | 더 어둡고 차분하게 |
+| `border-subtle` | `rgba(255,255,255,0.07)` | `rgba(255,255,255,0.08)` | 미세 조정 |
+
+#### 퍼플 → 인디고/슬레이트 전환
+
+| 요소 | 현재 | 변경 후 |
+| --- | --- | --- |
+| Login 버튼 | `from-purple-600 to-purple-500 gradient` | `bg-indigo-600` solid + `hover:bg-indigo-500` |
+| Login 버튼 그림자 | `shadow-purple-500/20` | 제거 |
+| 로고 glow blur | `bg-purple-500/40 blur-md` | `bg-indigo-500/20 blur-sm` (약화) |
+| Active nav | `bg-purple-500/15 text-purple-300` | `bg-slate-700/60 text-slate-100` |
+| Active nav dot | `bg-purple-400` | `bg-cyan-400` |
+| Send 버튼 | `bg-purple-600 hover:bg-purple-500` | `bg-indigo-600 hover:bg-indigo-500` |
+| Citation 제목 | `text-purple-300` | `text-slate-100` |
+| arXiv 링크 | `text-purple-400/70` | `text-cyan-400/70` |
+| Focus ring | `focus:ring-purple-500` | `focus:ring-indigo-500/60` |
+| Score bar (high) | `#a855f7` | `#6366f1` (인디고) |
+| Score bar (mid) | `#6366f1` | `#4b5563` (gray) |
+| Login orb | `bg-purple-700/10 blur-3xl` | 제거 |
+| Sidebar logo glow | `bg-purple-500/40 blur-md` | `bg-slate-600/30 blur-sm` |
+
+#### 유지하는 것
+
+| 요소 | 이유 |
+| --- | --- |
+| 로고 아이콘 배경 `from-purple-500 to-purple-700` | 브랜드 포인트 1개 허용 |
+| `text-emerald-400` Health Online | 시맨틱 색상 유지 |
+| `text-red-400` Health Offline | 시맨틱 색상 유지 |
+| `bg-yellow-500/10` Warning 배너 | 시맨틱 색상 유지 |
+| `bg-green-500/10` 성공 피드백 | 시맨틱 색상 유지 |
+
+---
+
+### 6-3. 화면별 퍼플 허용 개수 룰
+
+| 화면 | 최대 강한 색 요소 수 | 허용 위치 |
+| --- | --- | --- |
+| LoginPage | 2개 | 로고 배경, Login 버튼 (indigo로 전환) |
+| Layout (Sidebar) | 1개 | 로고 아이콘 그라디언트만 |
+| QueryPage | 1개 | Send 버튼 (indigo로 전환) |
+| DocumentsPage | 0개 | 업로드/삭제는 neutral |
+| AdminPage | 1개 | Rebuild 버튼 (indigo로 전환) |
+
+---
+
+### 6-4. 구현 순서 (다음 세션)
+
+1. `Layout.tsx` — Active nav 색, sidebar glow, `w-58` → `w-60`
+2. `LoginPage.tsx` — 버튼 gradient 제거, orb 제거, focus ring 변경
+3. `QueryPage.tsx` — Send 버튼, citation 카드 제목, arXiv 링크, score bar
+4. `DocumentsPage.tsx` + `AdminPage.tsx` — 버튼 색 통일
+5. 전체 빌드 확인 + 테스트
+
+---
+
+*Phase 2.1 설계 작성: 2026-03-26 / Edwin Cho*
