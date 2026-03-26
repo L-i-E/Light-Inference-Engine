@@ -122,10 +122,22 @@ export default function QueryPage() {
   const [suggestLoading, setSuggestLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const MAX_TEXTAREA_HEIGHT = 140; /* ~5 lines */
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  /* Auto-focus on mount */
+  useEffect(() => { textareaRef.current?.focus(); }, []);
+
+  /* Auto-resize textarea */
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(ta.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+  }, [input]);
 
   const loadSuggestedQueries = useCallback(async () => {
     setSuggestLoading(true);
@@ -185,7 +197,13 @@ export default function QueryPage() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Escape') {
+      setInput('');
+      return;
+    }
+    const cmdEnter = (e.metaKey || e.ctrlKey) && e.key === 'Enter';
+    const enterOnly = e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey;
+    if (cmdEnter || enterOnly) {
       e.preventDefault();
       void handleSubmit();
     }
@@ -282,8 +300,9 @@ export default function QueryPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a question about your papers… (Enter to send, Shift+Enter for newline)"
-            rows={2}
+            placeholder="Ask a question… (Enter to send, Shift+Enter for newline, Esc to clear)"
+            rows={1}
+            style={{ maxHeight: MAX_TEXTAREA_HEIGHT, overflowY: 'auto' }}
             className="flex-1 bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-600 text-[15px] focus:outline-none focus:ring-1 focus:ring-indigo-500/60 focus:border-indigo-500/40 resize-none transition"
           />
           <div className="flex flex-col gap-2 shrink-0">
