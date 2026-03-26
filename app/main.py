@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import random
 import re
 import shutil
 import uuid
@@ -20,6 +22,7 @@ from app.models.schemas import (
     QueryRequest,
     QueryResponse,
     RebuildResponse,
+    SuggestQueriesResponse,
     TokenRequest,
     TokenResponse,
 )
@@ -110,6 +113,68 @@ def _single_source_warnings(query: str, citations) -> list[str]:
     if e2 not in sources:
         warns.append(f"Comparison query detected: no source related to '{m.group(2)}' retrieved")
     return warns
+
+
+# ── Suggest Queries ──────────────────────────────────────────────────────────
+
+_SUGGEST_CACHE_PATH = Path(__file__).resolve().parent.parent / "data" / "index" / "suggested_queries.json"
+
+
+def _sample_diverse_chunks(metadata: list, n_papers: int = 8) -> list[str]:
+    """서로 다른 논문에서 청크를 1개씩 샘플링. 텍스트 길이 기준으로 대표 청크 선택."""
+    by_paper: dict[str, list[dict]] = {}
+    for m in metadata:
+        fn = m.get("source_filename", "")
+        if fn:
+            by_paper.setdefault(fn, []).append(m)
+
+    papers = list(by_paper.keys())
+    random.shuffle(papers)
+    selected = papers[:n_papers]
+
+    chunks = []
+    for paper in selected:
+        candidates = by_paper[paper]
+        best = max(candidates, key=lambda m: len(m.get("text", "")))
+        text = best.get("text", "").strip()
+        if text:
+            chunks.append(text)
+    return chunks
+
+
+@app.get("/suggest-queries", response_model=SuggestQueriesResponse, tags=["RAG"])
+async def suggest_queries(
+    _user: dict = Depends(require_role(Role.RESEARCHER)),
+) -> SuggestQueriesResponse:
+    """
+    인덱싱된 논문 청크를 기반으로 LLM이 답변 가능한 연구 질문 4개를 생성.
+    최초 1회 생성 후 캐시 파일에 저장; 이후 요청은 캐시에서 즉시 반환.
+    캐시는 rebuild-index 호출 시 초기화됨.
+    """
+    if _SUGGEST_CACHE_PATH.exists():
+        try:
+            with open(_SUGGEST_CACHE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list) and len(data) >= 2:
+                return SuggestQueriesResponse(questions=data, cached=True)
+        except Exception:
+            pass
+
+    store = VectorStore.get()
+    metadata = store.get_all_metadata()
+    if not metadata:
+        return SuggestQueriesResponse(questions=[])
+
+    chunks = _sample_diverse_chunks(metadata)
+    generator = Generator.get()
+    questions = generator.suggest_queries(chunks)
+
+    if questions:
+        _SUGGEST_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(_SUGGEST_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(questions, f, ensure_ascii=False)
+
+    return SuggestQueriesResponse(questions=questions, cached=False)
 
 
 # ── Query ─────────────────────────────────────────────────────────────────────
@@ -268,6 +333,8 @@ async def rebuild_index(
     if all_vectors:
         combined = np.vstack(all_vectors).astype(np.float32)
         store.rebuild(combined, all_meta)
+
+    _SUGGEST_CACHE_PATH.unlink(missing_ok=True)
 
     return RebuildResponse(
         documents_reindexed=doc_count,

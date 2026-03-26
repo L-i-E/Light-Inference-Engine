@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { QueryResponse, IngestResponse, DeleteResponse, RebuildResponse, TokenResponse } from './types';
+import type { QueryResponse, IngestResponse, DeleteResponse, RebuildResponse, TokenResponse, SuggestQueriesResponse } from './types';
 
 const client = axios.create({ baseURL: '/api' });
 
@@ -36,6 +36,11 @@ export const api = {
 
   rebuildIndex: async (): Promise<RebuildResponse> => {
     const res = await client.post<RebuildResponse>('/admin/rebuild-index');
+    return res.data;
+  },
+
+  suggestQueries: async (): Promise<SuggestQueriesResponse> => {
+    const res = await client.get<SuggestQueriesResponse>('/suggest-queries');
     return res.data;
   },
 };

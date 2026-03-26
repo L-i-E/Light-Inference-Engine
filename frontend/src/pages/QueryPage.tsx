@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import type { Citation, QueryResponse } from '@/lib/types';
-import { Send, Loader2, BookOpen, AlertTriangle, ExternalLink, Copy, Check, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Loader2, BookOpen, AlertTriangle, ExternalLink, Copy, Check, Trash2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import MathRenderer from '@/components/MathRenderer';
 
 interface Message {
@@ -13,7 +13,7 @@ interface Message {
   warning?: string;
 }
 
-const EXAMPLE_QUERIES = [
+const FALLBACK_QUERIES = [
   'What is the attention mechanism?',
   'How does BERT pre-training work?',
   'Compare encoder-only vs decoder-only models',
@@ -118,12 +118,28 @@ export default function QueryPage() {
   const [topK, setTopK] = useState(5);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({});
+  const [suggestedQueries, setSuggestedQueries] = useState<string[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const loadSuggestedQueries = useCallback(async () => {
+    setSuggestLoading(true);
+    try {
+      const res = await api.suggestQueries();
+      setSuggestedQueries(res.questions.length >= 2 ? res.questions : FALLBACK_QUERIES);
+    } catch {
+      setSuggestedQueries(FALLBACK_QUERIES);
+    } finally {
+      setSuggestLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadSuggestedQueries(); }, [loadSuggestedQueries]);
 
   const handleCopy = (id: string, text: string) => {
     void navigator.clipboard.writeText(text);
@@ -201,16 +217,30 @@ export default function QueryPage() {
             <h3 className="text-white font-medium">Ask anything about your papers</h3>
             <p className="text-slate-500 text-sm mt-1.5 max-w-sm">Queries are answered using only your indexed documents with forced citations.</p>
             <div className="flex flex-wrap gap-2 justify-center mt-6 max-w-md">
-              {EXAMPLE_QUERIES.map((q) => (
-                <button
-                  key={q}
-                  onClick={() => { setInput(q); textareaRef.current?.focus(); }}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-600 hover:bg-slate-800/60 transition"
-                >
-                  {q}
-                </button>
-              ))}
+              {suggestLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-7 w-44 rounded-lg bg-slate-800/60 animate-pulse" />
+                ))
+              ) : (
+                suggestedQueries.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => { setInput(q); textareaRef.current?.focus(); }}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-600 hover:bg-slate-800/60 transition text-left"
+                  >
+                    {q}
+                  </button>
+                ))
+              )}
             </div>
+            {!suggestLoading && (
+              <button
+                onClick={() => void loadSuggestedQueries()}
+                className="mt-3 flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-400 transition"
+              >
+                <Sparkles className="w-3 h-3" /> Regenerate suggestions
+              </button>
+            )}
           </div>
         )}
         {messages.map((msg) => (

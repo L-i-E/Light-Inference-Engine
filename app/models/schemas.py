@@ -74,6 +74,13 @@ class RebuildResponse(BaseModel):
     status: str = "ok"
 
 
+# ── Suggest Queries ─────────────────────────────────────────────────────────
+
+class SuggestQueriesResponse(BaseModel):
+    questions: List[str]
+    cached: bool = False
+
+
 # ── Health ──────────────────────────────────────────────────────────────────
 
 class HealthResponse(BaseModel):

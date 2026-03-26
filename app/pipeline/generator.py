@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import List, Tuple
 
@@ -304,3 +305,62 @@ class Generator:
         citations = _filter_by_contribution(answer, citations, retrieved)
 
         return answer, citations
+
+    def suggest_queries(self, chunks: List[str]) -> List[str]:
+        """
+        논문 청크 샘플을 기반으로 LLM이 답변 가능한 연구 질문 4개 생성.
+        파싱 실패 시 빈 리스트 반환 (프론트엔드 fallback 처리).
+        """
+        if not chunks:
+            return []
+
+        context = "\n\n---\n\n".join(
+            f"[Excerpt {i + 1}]\n{chunk[:400]}" for i, chunk in enumerate(chunks)
+        )
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a research assistant. Based on the paper excerpts provided, "
+                    "generate exactly 4 specific and concise research questions that can be "
+                    "answered using these documents. "
+                    "Return ONLY a valid JSON array of 4 question strings. "
+                    'Example: ["Question 1?", "Question 2?", "Question 3?", "Question 4?"] '
+                    "Do NOT include any explanation, markdown code fences, or extra text."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Paper excerpts:\n{context}\n\nJSON array of 4 questions:",
+            },
+        ]
+
+        text = self._tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        inputs = self._tokenizer([text], return_tensors="pt").to(self._device)
+
+        with torch.no_grad():
+            output_ids = self._model.generate(
+                **inputs,
+                max_new_tokens=256,
+                do_sample=False,
+                pad_token_id=self._tokenizer.eos_token_id,
+            )
+
+        generated = output_ids[0][inputs["input_ids"].shape[1]:]
+        raw = self._tokenizer.decode(generated, skip_special_tokens=True).strip()
+
+        try:
+            match = re.search(r'\[.*?\]', raw, re.DOTALL)
+            if match:
+                questions = json.loads(match.group())
+                if isinstance(questions, list):
+                    valid = [str(q).strip() for q in questions if str(q).strip()]
+                    if len(valid) >= 2:
+                        return valid[:4]
+        except Exception:
+            pass
+
+        return []
