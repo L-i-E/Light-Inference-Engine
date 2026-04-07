@@ -55,7 +55,13 @@ Rules:
 11. VERBATIM NUMERICS — Never insert a specific number (percentage, score, count) unless that exact value appears verbatim in the retrieved context.
     - BAD:  "The average improvement is 89.33%" when the context only says "outperforms on average".
     - GOOD: "The context states that Adam pre-training outperforms SGD on average [Source: ...] but provides no specific aggregate figure."
-    - If the context gives a trend/direction without an exact figure, describe the trend only."""
+    - If the context gives a trend/direction without an exact figure, describe the trend only.
+12. NUMERIC ABSTENTION — When you want to include a precise figure but cannot find it verbatim in the retrieved passages, explicitly state the absence rather than estimating or rounding.
+    - BAD:  "LoRA reduces trainable parameters by approximately 60–70% compared to full fine-tuning." ← estimation not grounded in context
+    - GOOD: "LoRA drastically reduces the number of trainable parameters by injecting low-rank matrices [Source: LoRA.pdf | Section: 3 | p.4], but the exact reduction percentage is not reported in the retrieved passages."
+13. COMPARISON COMPLETENESS — When a question compares two entities (A vs B), if retrieved context covers only one side, explicitly note the missing side rather than answering only about the covered entity.
+    - BAD:  Answering only about LoRA when asked "LoRA vs full fine-tuning".
+    - GOOD: Answer what the context provides about each side; for the uncovered side write "[entity] details are not present in the retrieved documents." """
 
 
 def _build_context_block(retrieved: List[Tuple[dict, float]]) -> str:
@@ -95,6 +101,21 @@ _METRIC_LABEL_STOPWORDS = frozenset({
     'achieves', 'score', 'rate', 'value', 'result', 'performance',
     'percentage', 'point', 'reaches', 'obtains', 'shows', 'gets',
 })
+
+_METRIC_INDICATOR_WORDS = frozenset({
+    'accuracy', 'acc', 'precision', 'recall', 'f1', 'bleu', 'rouge',
+    'top1', 'top5', 'map', 'ndcg', 'mrr', 'perplexity', 'wer', 'cer',
+    'flop', 'flops', 'param', 'params', 'latency', 'throughput', 'speedup',
+    'reduction', 'improvement', 'compression', 'trainable', 'parameters',
+    'benchmark', 'error', 'loss', 'gain', 'drop', 'delta', 'baseline',
+})
+
+
+def _looks_like_metric_label(label: str) -> bool:
+    """Return True only if label contains at least one metric-specific indicator word.
+    Filters out garbled OCR text or generic English phrases.
+    """
+    return bool(set(label.lower().split()) & _METRIC_INDICATOR_WORDS)
 
 
 def _metric_label_context(text: str, window: int = 60) -> dict[str, list[str]]:
@@ -172,6 +193,8 @@ def _check_metric_fidelity(
             source_words.update(lbl.split())
 
         for a_lbl in answer_labels:
+            if not _looks_like_metric_label(a_lbl):
+                continue  # skip: garbled OCR or generic phrase, not a real metric label
             a_words = set(a_lbl.split())
             if a_words and not (a_words & source_words):
                 best_src = source_map[num][0] if source_map[num] else "unknown"
@@ -375,6 +398,11 @@ class Generator:
             "ModelFoo was noted to obtain state-of-the-art performance on BenchmarkX at the time of publication "
             "[Source: foo_paper.pdf | Section: Abstract | p.1]. "
             "A separate metric for TaskC is not reported in the provided documents.\n\n"
+            "Q: What is the key difference between MethodA and MethodB in terms of parameter efficiency?\n"
+            "A: MethodA freezes all pretrained weights and introduces small trainable adapter modules, requiring far fewer updated parameters "
+            "[Source: methodA.pdf | Section: 3 | p.5]. "
+            "The exact percentage reduction in trainable parameters relative to MethodB is not reported in the retrieved passages. "
+            "Details on MethodB's parameter efficiency are not present in the retrieved documents.\n\n"
             f"Context:\n{context}\n\n"
             f"Question: {query}\n"
             "Answer (follow the example format — include [Source: ...] after every factual claim, "
