@@ -4,7 +4,7 @@ import type { UserRole } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSession } from '@/contexts/SessionContext';
 import { useEffect, useState } from 'react';
-import { MessageSquare, FolderOpen, Settings, LogOut, Wifi, WifiOff, Sun, Moon, Plus, Trash2, Clock } from 'lucide-react';
+import { MessageSquare, FolderOpen, Settings, LogOut, Wifi, WifiOff, Sun, Moon, Plus, Trash2, Clock, Pencil } from 'lucide-react';
 import LiELogo from '@/components/LiELogo';
 
 const allNavItems = [
@@ -63,7 +63,9 @@ export default function Layout() {
   const { logout, role } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const { sessions, currentId, startNew, openSession, removeSession } = useSession();
+  const { sessions, currentId, startNew, openSession, removeSession, renameSession } = useSession();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
 
   const handleLogout = () => {
     logout();
@@ -138,7 +140,7 @@ export default function Layout() {
               sessions.map((s) => (
                 <div
                   key={s.id}
-                  onClick={() => handleOpenSession(s.id)}
+                  onClick={() => { if (editingId !== s.id) handleOpenSession(s.id); }}
                   className={`group flex items-start gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-all duration-150 ${
                     currentId === s.id
                       ? 'bg-slate-800 text-slate-200'
@@ -146,15 +148,58 @@ export default function Layout() {
                   }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs truncate leading-tight">{s.title}</p>
+                    {editingId === s.id ? (
+                      <input
+                        autoFocus
+                        className="w-full text-xs bg-slate-700 text-slate-100 rounded px-1.5 py-0.5 outline-none border border-emerald-500/50"
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onBlur={() => {
+                          renameSession(s.id, editingTitle);
+                          setEditingId(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            renameSession(s.id, editingTitle);
+                            setEditingId(null);
+                          } else if (e.key === 'Escape') {
+                            setEditingId(null);
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <p
+                        className="text-xs truncate leading-tight"
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setEditingId(s.id);
+                          setEditingTitle(s.title);
+                        }}
+                      >
+                        {s.title}
+                      </p>
+                    )}
                     <p className="text-[10px] text-slate-700 mt-0.5">{formatRelativeTime(s.createdAt)}</p>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); removeSession(s.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 mt-0.5 rounded text-slate-600 hover:text-red-400 transition shrink-0"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(s.id);
+                        setEditingTitle(s.title);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-slate-600 hover:text-emerald-400 transition"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeSession(s.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-slate-600 hover:text-red-400 transition"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ))
             )}

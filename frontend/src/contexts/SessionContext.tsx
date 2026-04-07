@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { ChatMessage, Session } from '@/lib/types';
-import { readSessions, upsertSession, deleteSessionById } from '@/lib/sessions';
+import { readSessions, upsertSession, deleteSessionById, renameSession as renameSessionStorage } from '@/lib/sessions';
 
 interface SessionContextType {
   sessions: Session[];
@@ -17,6 +17,7 @@ interface SessionContextType {
   startNew: () => void;
   openSession: (id: string) => void;
   removeSession: (id: string) => void;
+  renameSession: (id: string, title: string) => void;
 }
 
 const Ctx = createContext<SessionContextType | null>(null);
@@ -60,6 +61,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setCurrentId(id);
   }, []);
 
+  const renameSession = useCallback((id: string, title: string) => {
+    const updated = renameSessionStorage(id, title);
+    setSessions(updated);
+  }, []);
+
   const removeSession = useCallback((id: string) => {
     const updated = deleteSessionById(id);
     setSessions(updated);
@@ -72,7 +78,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ sessions, currentId, sessionKey, persistMessages, startNew, openSession, removeSession }}
+      value={{ sessions, currentId, sessionKey, persistMessages, startNew, openSession, removeSession, renameSession }}
     >
       {children}
     </Ctx.Provider>

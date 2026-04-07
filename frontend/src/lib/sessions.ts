@@ -38,3 +38,11 @@ export function deleteSessionById(id: string): Session[] {
   writeSessions(updated);
   return updated;
 }
+
+export function renameSession(id: string, title: string): Session[] {
+  const updated = readSessions().map((s) =>
+    s.id === id ? { ...s, title: title.trim() || s.title } : s,
+  );
+  writeSessions(updated);
+  return updated;
+}
