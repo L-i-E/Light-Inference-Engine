@@ -318,6 +318,73 @@ def _build_citations(retrieved: List[Tuple[dict, float]]) -> List[Citation]:
 
 _SENT_SPLIT_RE = re.compile(r'(?<=[.!?])\s+')
 
+_NUM_RE = re.compile(
+    r"""
+    \b
+    (
+        \d{1,4}                # 정수 (1~4자리, 연도 포함)
+        (?:\.\d+)?             # 소수 부분
+        \s*(?:%|k|M|B|x)?     # 단위
+    )
+    \b
+    """,
+    re.VERBOSE,
+)
+
+
+def _extract_context_numbers(retrieved: List[Tuple[dict, float]]) -> set[str]:
+    """retrieved 청크 전체에서 등장하는 숫자 문자열 집합 반환."""
+    nums: set[str] = set()
+    for meta, _ in retrieved:
+        text = meta.get("text", "") + " " + meta.get("content", "")
+        for m in _NUM_RE.finditer(text):
+            nums.add(m.group(1).strip())
+    return nums
+
+
+def _scrub_hallucinated_numerics(
+    answer: str,
+    retrieved: List[Tuple[dict, float]],
+) -> str:
+    """
+    Tier 2 Post-hoc Numeric Scrubbing (P13).
+    answer에 포함된 숫자 중 retrieved 청크에 없는 것을 탐지하여
+    해당 숫자를 '[?]'로 대체. 추가 inference 없음.
+
+    Coverage:
+    - 정수/소수/퍼센트/배수(k, M, B, x)
+    - citation 태그 내부 숫자는 건드리지 않음
+    - 연도(1000~2099)는 false positive 방지를 위해 제외
+    """
+    context_nums = _extract_context_numbers(retrieved)
+    if not context_nums:
+        return answer
+
+    def _replace(m: re.Match) -> str:
+        val = m.group(1).strip()
+        if not val:
+            return m.group(0)
+        bare = re.sub(r'[%kMBx\s]', '', val)
+        try:
+            num_float = float(bare)
+        except ValueError:
+            return m.group(0)
+        if 1000 <= num_float <= 2099:
+            return m.group(0)
+        if val in context_nums or bare in context_nums:
+            return m.group(0)
+        return m.group(0).replace(val, '[?]', 1)
+
+    citation_safe_re = re.compile(r'(\[Source:[^\]]+\])')
+    parts = citation_safe_re.split(answer)
+    scrubbed_parts = []
+    for part in parts:
+        if citation_safe_re.fullmatch(part):
+            scrubbed_parts.append(part)
+        else:
+            scrubbed_parts.append(_NUM_RE.sub(_replace, part))
+    return ''.join(scrubbed_parts)
+
 
 def _inject_citations_post_hoc(
     answer: str,
@@ -492,6 +559,7 @@ class Generator:
             return FALLBACK_ANSWER, []
 
         answer = _inject_citations_post_hoc(answer, retrieved)
+        answer = _scrub_hallucinated_numerics(answer, retrieved)
 
         all_citations = _build_citations(retrieved)
 
