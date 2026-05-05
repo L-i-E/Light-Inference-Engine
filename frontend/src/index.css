@@ -157,3 +157,12 @@ html:not(.dark) .placeholder-slate-500::placeholder { color: #94a3b8; }
 ::view-transition-new(root) {
   animation: 200ms ease-in both vt-fade-in;
 }
+
+/* ── Card shadow utilities (F-E_Design.md dark-theme adaptation) ─────────── */
+.shadow-card    { box-shadow: 0 2px 8px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20); }
+.shadow-emerald { box-shadow: 0 0 16px rgba(16,185,129,0.10), 0 2px 8px rgba(0,0,0,0.28); }
+.shadow-glow    { box-shadow: 0 0 24px rgba(16,185,129,0.15), 0 4px 12px rgba(0,0,0,0.32); }
+
+html:not(.dark) .shadow-card    { box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.06); }
+html:not(.dark) .shadow-emerald { box-shadow: 0 0 12px rgba(16,185,129,0.08), 0 1px 4px rgba(0,0,0,0.06); }
+html:not(.dark) .shadow-glow    { box-shadow: 0 0 20px rgba(16,185,129,0.12), 0 2px 8px rgba(0,0,0,0.08); }
